@@ -1,0 +1,53 @@
+Hardware documentation for: MATE Motor Control PCBA, REV 1
+
+Component identification: 
+
+    6 Motor drives (Pololu 24V12)
+        Numbered (and addressed) 1-6, starting in the upper left corner and counting clockwise.
+        Drives 1-3 are connected to +24V_A, and drives 4-6 are connected to +24V_B. The drives can
+        be reprogrammed by lifting the end connected to the 0.1in header to access the USB port.
+        Motor speed limit should be set to 2400 and baud rate to 9600 for all drives, addresses 
+        count as described earlier. 
+
+        Bank 1 RESET: PC3 / A3
+        Bank 2 RESET: PC2 / A2
+        All Banks TX: PC4 / A4
+   
+    8 Low-Side Switches:
+        These switches are broken out to odd numbered pins on the wire terminals. They can sink up to
+        3A each if the supply rail has suffficent capacity. Even numbered pins can be configured to
+        supply +24V or +48V. Short-circuit protection may not work at 48V.
+
+        DIO0-DIO3 - +24V_A
+        DIO 0: PD6 / D6
+        DIO 1: PD5 / D5
+        DIO 2: PD4 / D4
+        DIO 3: PD3 / D3
+        DIO0-DIO4 - +24V_B
+        DIO 4: PB2 / D10
+        DIO 5: PB1 / D9
+        DIO 6: PB0 / D8
+        DIO 7: PD7 / D7
+
+    1 RS485 Tranciever
+        This tranciever recieves data from the control board to command the motor drives and low-side switches.
+        PLEASE NOTE PULLUPS MUST BE ENABLED ON THE UART RX PINS IF THE DIR PIN IS EVER GOING TO BE HIGH!
+
+        TX/RX: UART0
+        DIR  : PD2 / D2 (LOW is RX mode, HIGH is TX mode)
+
+    2 RS485 Periphrial Ports:
+        These are simply breakouts for RS485 buses 1-2 from the control PCB. They hav no connection the the MC
+        board microcontroller. A 4-pin Harwin Datamate L-tek is used as the connector. +5v is rated for 0.5A total across both buses,
+        GND is rated for 3A per bus. Pinouts are as follows:
+        
+        +5v   : 1
+        485_A : 2
+        485_B : 3
+        GND   : 4
+
+    1 ATMEGA328P
+        Midrange AVR microcontroller, the same as used on the Arduino UNO. Clock is a 16MHz crystal. Vcc is 5v.
+
+    1 6-Pin AVR ISP Port
+        A standard AVR 6-Pin AVR programming port. Vtg is left floating. This port is the only way to program the board.

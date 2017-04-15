@@ -1,0 +1,28 @@
+monitors:
+    surface:
+        addr: 192.168.1.2
+        udp_port: 9000
+        tcp_port: 9001
+    odroid:
+        addr: 192.168.1.10
+        udp_port: 9010
+        tcp_port: 9011
+
+modules:
+    bridge:
+        cmd: "python rov_modules/bridge.py"
+        update_frequency: 20
+        mon: odroid
+
+    teleop:
+        cmd: "python rov_modules/basic_teleop.py"
+        update_frequency: 20
+        mon: surface
+
+    joystick:
+        cmd: "python surface_modules/joystick_direct.py"
+        mon: surface
+
+
+
+

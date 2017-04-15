@@ -1,0 +1,45 @@
+MATE Control board developer notes:
+
+Hardware setup: Plug the ODROID-C2 into the 40 pin header. Supply between 10 and 28V DC at at least 0.5A between the GND and one or both of he +24VA and +24VB pins on the 5-pin power connector. Pin 1 is closest to the duck, pins 2 and 3 are ground, and pins 4 and 5 are +24VA and +24VB on this connector. Attach an ethernet cable between the odroid and the PC.
+
+Odroid software configuration notes (needed only on inital bring-up):
+    From a fresh install of arch linux ARM:
+    IP address must be set to static 192.168.1.10 (Christian, please elaborate how to do this)
+    The odroid must have AVRDUDE installed (pacman -S avrdude)
+    ADD THE FOLLOWING LINES to /etc/modprobe.d/w1_gpio.conf:
+        blacklist w1_gpio
+        blacklist wire
+    This prevents the dallas 1-wire library from taking over use of GPIO #7, used for the atMega reset line. Falure to do this may result in erratic behaior or INTERMITENT FAILURES!
+    Copy the arduino etc/avrdude.conf to the Odroid at /etc/avrdude.conf
+
+AtMega software configuration (needed only on inital bring-up): (hope you never need to use these -- that would imply quite a big OOPS!)
+    The fuses and bootloader can be burned from the arduino IDE with the custom boards.txt file and bootloader hex file. In order to do this, connect the ICP port on the control board to an AVR ISP device of your choosing. Select the appropriate board (MATE Control PCB (Ethernet connection, Mega2560)) and ISP device from the arduino tools menu, then select "burn bootloader". Bootloader source is also available, it has been modified to use UART3 instead fo UART0, and the bootloader LED has been reassigned to port K, pin 2. The atMega runs with a VCC of 5V and is clocked by a 16MHz crystal. Note that the Vtg pin on the ISP header is floating, and the PCB must be powered externally for this operation to succeed.
+
+Host PC configuration:
+    For the time being, the host PC must run linux or possibly mac OS
+    The host PC must be configured to connect to the odroid over ethernet with manual addresing. The meathod to achieve this is OS-dependent. If "internet connection sharing" or similar forwarding can be configured, this will provide internet access to the odroid, although this is not usually nescisary.
+    The host PC must have the Arduino IDE, ssh, and scp installed
+    The host PC muts be able to log into the alarm account on the odroid without a password. Copying ssh keys with ssh-copy-id is the easiest way to achieve this.
+    Several files must be copied into the arduino IDE. This includes hardware/arduino/avr/platform.txt, hardware/arduino/avr/boards.txt hardware/arduino/avr/bootloaders/stk500v2/stk500boot_v2_mega2560_uart3.hex, and hardware/arduino/avr/variants/matectl/pins_arduino.c
+    Start the Arduino IDE and select the MATE Control PCB (Ethernet connection, Mega2560) option for board type. Serial port selecton is ignored.
+    Upload your code wih the upload button!
+
+Hardware pinouts:
+    Voltages: The main +5v rail powers the odroid and AtMega. It can supply 3A, and has tens of mv of ripple. The secondary +5V rail is intended to power off-board sensors connected via RS485. It can supply 500ma, and has tens of mv of ripple. Both rails have OCP, and OCP on the secondary rail will not trip upstream OCP.
+    AtMega reset: The atmega may be reset with a high pulse on odroid GPIO X21 (WiringPI pin 7). When a reset is not desired, this pin MUST be set low (perfered), or as an input WITHOUT pullup
+    Serial: The atMega uses a STK500v2 bootloader running at 115200 baude on UART3. This is connectd through a level-shifter to /dev/ttyS1 on the odroid.
+    Debug LEDs, odroid: The top two LEDs are connected to the odroid. The topmost led is GREEN, and is connected to GPIO Y3 (wPI 27). Intended use is showing the the odroid has booted. The next LED is yellow, and is connected to GPIO Y7 (wPI 24). Intended use is gnenral debugging.
+    Debug LEDs, atmega: The bottom 3 LED's are connected to the atMega GPIO's K0-K2 (arduino D62-D64). They are, in order from top to bottom and PK0 to PK2: A red FAULT LED, a green POWER LED, and a yellow DEBUG LED. The dubug LED is also used to indicate bootloader activity
+    RS485: UART0-2 on the AtMega are connected to RS485 busses 0-2 using MAX485 trancievers. RE and DE signals are as follows: PLEASE NOTE PULLUPS MUST BE ENABLED ON THE UART RX PINS IF THE ~RE INPUT IS EVER GOING TO BE HIGH!
+        485_B0: ~RE = PE2 (D70), DE = PE3 (D5)
+        485_B1: ~RE = PD4 (D71), DE = PD5 (D72)
+        485_B2: ~RE = PH2 (D73), DE = PH3 (D6)
+    Humidity: A HIH6031 humidity and temprature sensor is connected to the atmega I2C bus
+    Voltage Monitoring: PF0-PF4 (A0-A4) are connected to voltage dividers for monitoring the various rails. they are configured as follows:
+    PF0/A0: +48V:       14.285714286 counts/volt
+    PF1/A1: +24VA:      14.285714286 counts/volt
+    PF2/A2  +24VB:      14.285714286 counts/volt
+    PF3/A3  +5V Main:   127.891156463 counts/volt
+    PF4/A4  +5V Periph: 127.891156463 counts/volt
+
+
