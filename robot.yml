@@ -10,17 +10,17 @@ monitors:
 
 modules:
     bridge:
-        cmd: "python rov_modules/bridge.py"
+        cmd: "python3 rov_modules/bridge.py"
         update_frequency: 20
         mon: odroid
 
     teleop:
-        cmd: "python rov_modules/basic_teleop.py"
+        cmd: "python3 rov_modules/basic_teleop.py"
         update_frequency: 20
         mon: odroid
 
     joystick:
-        cmd: "python surface_modules/joystick_direct.py"
+        cmd: "python3 surface_modules/joystick_direct.py"
         mon: surface
 
 
