@@ -63,12 +63,14 @@ while True:
                 if type & 0x80:
                     pass
 
-                if type & 0x01:
+                elif type & 0x01:
+                    print(number)
                     button_states[number] = value
 
-                if type & 0x02:
+                elif type & 0x02:
                     fvalue = value / 32767.0
                     axis_states[number] = fvalue
+
 
         except Exception as e:
             yeti_node.report_module_exception(module_id, e)

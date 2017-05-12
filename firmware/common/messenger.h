@@ -1,5 +1,3 @@
-#include <Arduino.h>
-#include "settings.h"
 #ifndef Messenger
 #define Messenger
 
@@ -11,7 +9,7 @@ struct Message {
   char dataLen;
 };
 
-void msgSetDebug(SoftwareSerial*);
+void flushToBus(int);
 void reportMessage(struct Message *);
 void configureBus(int, int);
 void writeToBus(char *, int, int);

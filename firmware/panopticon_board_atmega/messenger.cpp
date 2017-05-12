@@ -1,20 +1,14 @@
-#include <Arduino.h>
-#include <SoftwareSerial.h>
-
+#include "settings.h"
+#include "debug.h"
 #include "messenger.h"
-
-SoftwareSerial *msgDebugSerial;
-
-void msgSetDebug(SoftwareSerial *bus){
-  msgDebugSerial = bus;
-}
+#include <Arduino.h>
 
 void reportMessage(struct Message * message) {
-  msgDebugSerial->println("Reporting message:");
-  msgDebugSerial->println("prefix: " + String(message->prefix));
-  msgDebugSerial->println("key len: " + String((int) message->keyLen));
-  msgDebugSerial->println("message->key[0]: " + String(message->key[0]));
-  msgDebugSerial->println("data len: " + String((int) message->dataLen));
+  logDebug("Reporting message:");
+  logDebug("prefix: " + String(message->prefix));
+  logDebug("key len: " + String((int) message->keyLen));
+  logDebug("message->key[0]: " + String(message->key[0]));
+  logDebug("data len: " + String((int) message->dataLen));
 }
 
 void configureBus(int mode, int busId) { // mode is 1 for transmit, 0 for receive
@@ -32,10 +26,26 @@ void configureBus(int mode, int busId) { // mode is 1 for transmit, 0 for receiv
     digitalWrite(6, mode);
   }
   #endif
-  #ifdef MC_Board
+  #if defined(MC_Board) || defined(PC_Board)
   if (busId == 0){
     digitalWrite(2, mode);
   }
+  #endif
+}
+
+void flushToBus(int busId) {
+  if (busId == 0)
+    Serial.flush();
+
+  #ifdef CTL_Board
+  
+  else if (busId == 1)
+    Serial1.flush();
+  else if (busId == 2)
+    Serial2.flush();
+  else if (busId == 3)
+    Serial3.flush();
+
   #endif
 }
 
@@ -58,7 +68,7 @@ void writeToBus(char * buff, int len, int busId) {
 int availableFromBus(int busId) {
   if (busId == 0)
     return Serial.available();
-  //msgDebugSerial->println("Did it!");
+
   #ifdef CTL_Board
   else if (busId == 1)
     return Serial1.available();
@@ -77,7 +87,7 @@ int readBytesFromBus(char * buff, int len, int busId){
   char next_byte;
   while (bytes_read < len){
     if (millis() - start_time > 30){
-      //msgDebugSerial->println("Message timeout! Read " + String(bytes_read) + " bytes when was expecting " + String(len) + " bytes.");
+      logWarn("Warning: Message receive timeout.");
       #ifdef CTL_Board
       digitalWrite(62, HIGH);
       #endif
@@ -110,7 +120,7 @@ int readBytesFromBus(char * buff, int len, int busId){
 void sendMessage(struct Message * message, int busId) {
   configureBus(1, busId);
 
-  writeToBus(&(message->prefix), 1, busId); // Write preface ('s' for set, 'g' for get)
+  writeToBus(&(message->prefix), 1, busId); // Write preface ('s' for set, 'g' for get, 'r' for return value, 'd' for debug message)
   
   writeToBus(&(message->keyLen), 1, busId); // Write key length (1 byte)
   writeToBus(message->key, message->keyLen, busId); // Write key
@@ -118,8 +128,10 @@ void sendMessage(struct Message * message, int busId) {
   writeToBus(&(message->dataLen), 1, busId); // Write data length (1 byte)
   writeToBus(message->data, message->dataLen, busId); // Write data
 
+  flushToBus(busId);
+
   configureBus(0, busId);
-  //msgDebugSerial->println("Finished sending message!");
+  delay(1);
 }
 
 int receiveMessage(struct Message * message, int busId) {
@@ -129,34 +141,31 @@ int receiveMessage(struct Message * message, int busId) {
   int result;
   
   result = readBytesFromBus(&(message->prefix), 1, busId);
-
   if (!result)
     return result;
 
-  if (message->prefix != 'g' && message->prefix != 's' && message->prefix != 'r') {
+  if (message->prefix != 'g' && message->prefix != 's' && message->prefix != 'r' && message->prefix != 'd')
     return 0; // Bogus message!
-  }
   
   result = readBytesFromBus( &(message->keyLen), 1, busId);
-
   if (!result)
     return result;
   
   result = readBytesFromBus(message->key, message->keyLen, busId);
-  if (!result) {
-    return result;
-  }
+  if (!result)
+    return 0;
+
   message->dataLen = 0;
-  if (message->prefix == 's') {
+  if (message->prefix == 's' || message->prefix == 'd' || message->prefix == 'r') {
+    
     result = readBytesFromBus( &(message->dataLen), 1, busId);
-    if (!result){
-      //free(message->key);
-      return result;
-    }
+    if (!result)
+      return 0;
+
     result = readBytesFromBus(message->data, message->dataLen, busId);
-    if (!result) {
-      return result;
-    }
+    if (!result)
+      return 0;
+
   }
   return 1;
 }

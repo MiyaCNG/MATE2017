@@ -17,7 +17,7 @@ modules:
     teleop:
         cmd: "python rov_modules/basic_teleop.py"
         update_frequency: 20
-        mon: surface
+        mon: odroid
 
     joystick:
         cmd: "python surface_modules/joystick_direct.py"

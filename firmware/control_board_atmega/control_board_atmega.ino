@@ -1,21 +1,22 @@
-#define CTL_Board
 
-#include <SoftwareSerial.h>
-#include <Wire.h>
+#include "settings.h"
+#include "debug.h"
 #include "messenger.h"
+#include <Wire.h>
 
-SoftwareSerial DebugSerial(MISO, MOSI);
-
-//int B0_RE = 70;  //Serial Receive pin
-//int B0_TE = 5;  //Serial Transmit pin
-//int B1_RE = 71;  //Serial Receive pin
-//int B1_TE = 72;  //Serial Transmit pin
-//int B2_RE = 73; //Serial Receive pin
-//int B2_TE = 6;  //Serial Transmit pin
 long last_toggle;
 int last_value;
 
 void setup() {
+  initDebug();
+
+  pinMode(70, OUTPUT);
+  pinMode(5, OUTPUT);
+  pinMode(71, OUTPUT);
+  pinMode(72, OUTPUT);
+  pinMode(73, OUTPUT);
+  pinMode(6, OUTPUT);
+  
   last_value = 0;
   last_toggle = millis();
   pinMode(62, OUTPUT); // Error led
@@ -26,9 +27,9 @@ void setup() {
   digitalWrite(64, LOW); // Debug led low
 
   // Set pullups on 485 UART rx lines
-  digitalWrite(0, HIGH);
-  digitalWrite(19, HIGH);
-  digitalWrite(17, HIGH);
+  pinMode(0, INPUT_PULLUP);
+  pinMode(19, INPUT_PULLUP);
+  pinMode(17, INPUT_PULLUP);
 
   // Set all RS485 tranceivers to receive.
   configureBus(0, 0);
@@ -41,10 +42,8 @@ void setup() {
   Serial3.begin(115200);
 
   Wire.begin(); // i2c bus
-  
-  DebugSerial.begin(115200);
-  msgSetDebug(&DebugSerial);
-  DebugSerial.println("Control Board Atmega initialized.");
+
+  logInfo("Control Board Atmega initialized.");
 }
 
 void loop() {
@@ -59,20 +58,52 @@ void loop() {
   message.data = data;
   message.key = key;
   for (int i = 0; i < 4; i++) {
-    //DebugSerial.println("Awaiting message on " +String(i));
     if (receiveMessage(&message, i)){
-      //DebugSerial.println("Received message on bus " + String(i));
+
+      if (message.prefix == 'd') {
+        resendDebugMessage(&message);
+        continue;
+      }
+      
+      //logDebug("Got message: here it is!");
       //reportMessage(&message);
-      if (message.prefix == 'r') {
-        DebugSerial.println("Forwarding return value");
+      
+      if (message.prefix == 'r') { // Return value to forward
         sendMessage(&message, 3);
       }
-      else if (message.key[0] == 't') {
-        //DebugSerial.println("Setting thruster " + String((int)(message.key[1] - '0')) + " to " + String(*(int*)message.data));
+      else if (message.key[0] == 'a') { // Get alive message.
+        if (message.key[1] == '0') { // Master
+          data[0] = 0xFF;
+          struct Message response = {'r', message.key, message.keyLen, data, 1};
+          sendMessage(&response, 3);
+        }
+        else if (message.key[1] == '1'){ // Slave 1
+          //logInfo("Got a message!");
+          sendMessage(&message, 0);
+        }
+        else if (message.key[1] == '2') // Slave 2
+          sendMessage(&message, 1);
+        else if (message.key[1] == '3') // Slave 3
+          sendMessage(&message, 2);
+      }
+      else if (message.key[0] == 't' || message.key[0] == 's' || message.key[0] == 'r') { // Set thruster, switch, or reset motor controllers
         sendMessage(&message, 0);
       }
-      else if (message.key[0] == 'h') {
-        DebugSerial.println("Getting humidity");
+      else if (message.key[0] == 'p') { // Set panopticon
+        sendMessage(&message, 1);
+      }
+      else if (message.key[0] == 'v') { // Get voltage
+        struct Volts {
+          int v_48v = analogRead(A0);
+          int v_24vA = analogRead(A1);
+          int v_24vB = analogRead(A2);
+          int v_5vMain = analogRead(A3);
+          int v_5vPeriph = analogRead(A4);
+        } volts;
+        struct Message response = {'r', message.key, message.keyLen, (char *) &volts, sizeof(volts)};
+        sendMessage(&response, 3);
+      }
+      else if (message.key[0] == 'h') { // Get Humidity and Temperature
         unsigned int H_dat;
         unsigned int T_dat;
         fetch_humidity_temperature(&H_dat, &T_dat);
@@ -82,16 +113,16 @@ void loop() {
         } data;
         data.RH = (float) H_dat * 6.10e-3;
         data.T_C = (float) T_dat * 1.007e-2 - 40.0;
-        DebugSerial.println("H: " + String(data.RH));
-        DebugSerial.println("T: " + String(data.T_C));
+        logInfo("H: " + String(data.RH));
+        logInfo("T: " + String(data.T_C));
         struct Message response = {'r', message.key, message.keyLen, (char *) &data, sizeof(data)};
-        //DebugSerial.println("Sending message: here it is!");
-        //reportMessage(&response);
+        logDebug("About to send a response: here it is!");
+        reportMessage(&response);
         sendMessage(&response, 3);
-        //delay(10);
       }
-      else {
-        DebugSerial.println("No idea what we have here...");
+      else { // Unknown request
+        logInfo("Wat. No idea what we have here...");
+        reportMessage(&message);
       }
     }   
   }
@@ -121,6 +152,5 @@ byte fetch_humidity_temperature(unsigned int *p_H_dat, unsigned int *p_T_dat)
       T_dat = T_dat / 4;
       *p_H_dat = H_dat;
       *p_T_dat = T_dat;
-      DebugSerial.println("Got humidity!");
       return(_status);
 }
